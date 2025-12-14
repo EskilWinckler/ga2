@@ -5,6 +5,8 @@
 #define FP_TX_PIN 3   // Arduino pin connected to module RX
 #define FP_BAUD   9600
 
+const bool DEBUG_OUT = true;
+
 SoftwareSerial fpSerial(FP_RX_PIN, FP_TX_PIN);
 
 #define FP_SERIAL fpSerial
@@ -76,8 +78,13 @@ bool fp_send_command(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3, uint8_t p4
     // Send packet
     FP_SERIAL.write(packet, FP_PACKET_SIZE);
 
-    Serial.print("TX: ");
-    fp_print_packet(packet);
+    if (DEBUG_OUT) {
+        Serial.println();
+        Serial.print("Sending command ");
+        Serial.print(fp_cmd_to_string(cmd));
+        Serial.println(":");
+        fp_print_packet(packet);
+    }
 
     // Wait for response
     return fp_receive_response(cmd);
@@ -99,30 +106,42 @@ bool fp_receive_response(uint8_t expected_cmd) {
     }
 
     if (idx < FP_PACKET_SIZE) {
-        Serial.println("RX: Timeout");
+        if (DEBUG_OUT) {
+            Serial.println("Response: Timeout");
+            Serial.println();
+        }
         return false;
     }
 
-    Serial.print("RX: ");
-    fp_print_packet(response);
-
     // Validate packet structure
     if (response[0] != FP_PACKET_START_CODE || response[7] != FP_PACKET_END_CODE) {
-        Serial.println("Invalid packet framing");
+        if (DEBUG_OUT) {
+            Serial.println("Response: Invalid packet framing");
+            Serial.println();
+        }
         return false;
     }
 
     // Validate checksum
     uint8_t checksum = response[1] ^ response[2] ^ response[3] ^ response[4] ^ response[5];
     if (checksum != response[6]) {
-        Serial.println("Checksum error");
+        if (DEBUG_OUT) {
+            Serial.println("Response: Checksum error");
+            Serial.println();
+        }
         return false;
     }
 
     // Check ACK code (Q3 at offset 4)
     uint8_t ack = response[FP_ACK_OFFSET_Q3];
-    Serial.print("ACK: ");
-    Serial.println(fp_ack_to_string(ack));
+
+    if (DEBUG_OUT) {
+        Serial.print("Response ");
+        Serial.print(fp_ack_to_string(ack));
+        Serial.println(":");
+        fp_print_packet(response);
+        Serial.println();
+    }
 
     return (ack == FP_ACK_SUCCESS);
 }
